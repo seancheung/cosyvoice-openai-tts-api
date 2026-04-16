@@ -1,0 +1,83 @@
+name: build-images
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: v${{ matrix.version }}-${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['2', '3']
+        variant: ['cuda', 'cpu']
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune -a -f || true
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image name (lowercase)
+        id: imgname
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "image=ghcr.io/${repo}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute tag prefix
+        id: prefix
+        run: |
+          if [ "${{ matrix.variant }}" = "cpu" ]; then
+            echo "prefix=v${{ matrix.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "prefix=v${{ matrix.version }}-${{ matrix.variant }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.imgname.outputs.image }}
+          tags: |
+            type=raw,value=${{ steps.prefix.outputs.prefix }}-latest,enable={{is_default_branch}}
+            type=sha,prefix=${{ steps.prefix.outputs.prefix }}-,format=short
+            type=semver,pattern=${{ steps.prefix.outputs.prefix }}-{{version}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.${{ matrix.variant }}
+          build-args: |
+            COSYVOICE_VERSION=${{ matrix.version }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.version }}-${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.version }}-${{ matrix.variant }}

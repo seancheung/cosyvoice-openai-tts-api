@@ -1,0 +1,56 @@
+services:
+  cosyvoice2-cuda:
+    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-cuda-latest
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./models/CosyVoice2-0.5B:/models:ro
+      - ./voices:/voices:ro
+    environment:
+      COSYVOICE_VERSION: "2"
+      COSYVOICE_FP16: "true"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  cosyvoice3-cuda:
+    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:v3-cuda-latest
+    ports:
+      - "8003:8000"
+    volumes:
+      - ./models/Fun-CosyVoice3-0.5B:/models:ro
+      - ./voices:/voices:ro
+    environment:
+      COSYVOICE_VERSION: "3"
+      COSYVOICE_FP16: "true"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  cosyvoice2-cpu:
+    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-latest
+    ports:
+      - "8012:8000"
+    volumes:
+      - ./models/CosyVoice2-0.5B:/models:ro
+      - ./voices:/voices:ro
+    environment:
+      COSYVOICE_VERSION: "2"
+
+  cosyvoice3-cpu:
+    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:v3-latest
+    ports:
+      - "8013:8000"
+    volumes:
+      - ./models/Fun-CosyVoice3-0.5B:/models:ro
+      - ./voices:/voices:ro
+    environment:
+      COSYVOICE_VERSION: "3"

@@ -1,0 +1,46 @@
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+ARG COSYVOICE_VERSION=2
+ENV COSYVOICE_VERSION=${COSYVOICE_VERSION} \
+    DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    COSYVOICE_REPO_DIR=/opt/CosyVoice \
+    PYTHONPATH=/opt/CosyVoice:/opt/CosyVoice/third_party/Matcha-TTS:/opt/api
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git git-lfs build-essential curl wget ffmpeg sox libsox-dev \
+        unzip ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && git lfs install
+
+RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O /tmp/mf.sh \
+    && bash /tmp/mf.sh -b -p /opt/conda \
+    && rm /tmp/mf.sh
+ENV PATH=/opt/conda/bin:${PATH}
+
+RUN conda install -y -c conda-forge python=3.10 pynini==2.1.5 \
+    && conda clean -afy
+
+COPY CosyVoice /opt/CosyVoice
+
+RUN pip install --no-cache-dir -r /opt/CosyVoice/requirements.txt \
+    && pip cache purge || true
+
+COPY docker/requirements.api.txt /tmp/requirements.api.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.api.txt
+
+COPY app /opt/api/app
+
+WORKDIR /opt/api
+
+EXPOSE 8000
+
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["uvicorn", "app.server:app", "--host", "0.0.0.0", "--port", "8000"]

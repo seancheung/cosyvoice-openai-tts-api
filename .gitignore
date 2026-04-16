@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+.DS_Store
+*.log
+
+models/
+voices/*
+!voices/.gitkeep
+
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
