@@ -71,12 +71,15 @@ voices/
 
 ### 3. 运行容器
 
+除了 `/models` 下的主模型，CosyVoice 还会在首次使用时懒加载若干辅助模型：Whisper 缓存到 `~/.cache/whisper/`，HuggingFace tokenizer 缓存到 `~/.cache/huggingface/`，ModelScope 资源缓存到 `~/.cache/modelscope/`。把一个持久目录挂到容器的 `/root/.cache`，这些缓存就能在容器重启后复用，避免重复下载。
+
 GPU 版本（推荐）：
 
 ```bash
 docker run --rm -p 8000:8000 --gpus all \
   -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
+  -v $PWD/cache:/root/.cache \
   ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest
 ```
 
@@ -86,6 +89,7 @@ CPU 版本：
 docker run --rm -p 8000:8000 \
   -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
+  -v $PWD/cache:/root/.cache \
   ghcr.io/seancheung/cosyvoice-openai-tts-api:latest
 ```
 

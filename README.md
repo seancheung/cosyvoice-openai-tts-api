@@ -71,12 +71,15 @@ voices/
 
 ### 3. Run the container
 
+Beyond the main model mounted at `/models`, CosyVoice lazily downloads a few auxiliary models on first use — Whisper into `~/.cache/whisper/`, HuggingFace tokenizers into `~/.cache/huggingface/`, and any ModelScope resources into `~/.cache/modelscope/`. Mount a persistent directory at `/root/.cache` so these survive container restarts.
+
 GPU (recommended):
 
 ```bash
 docker run --rm -p 8000:8000 --gpus all \
   -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
+  -v $PWD/cache:/root/.cache \
   ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest
 ```
 
@@ -86,6 +89,7 @@ CPU:
 docker run --rm -p 8000:8000 \
   -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
+  -v $PWD/cache:/root/.cache \
   ghcr.io/seancheung/cosyvoice-openai-tts-api:latest
 ```
 
