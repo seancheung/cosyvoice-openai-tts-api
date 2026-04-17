@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="", case_sensitive=False, extra="ignore")
 
-    cosyvoice_version: Literal["2", "3"] = Field(default="2")
+    cosyvoice_version: Literal["2", "3"] = Field(default="3")
     cosyvoice_model_dir: str = Field(default="/models")
     cosyvoice_voices_dir: str = Field(default="/voices")
 
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     @classmethod
     def _coerce_version(cls, v):
         if v is None:
-            return "2"
+            return "3"
         return str(v).strip()
 
     @property

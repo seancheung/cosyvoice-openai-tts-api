@@ -17,12 +17,11 @@ permissions:
 
 jobs:
   build:
-    name: v${{ matrix.version }}-${{ matrix.variant }}
+    name: ${{ matrix.variant }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        version: ['2', '3']
         variant: ['cuda', 'cpu']
 
     steps:
@@ -58,9 +57,9 @@ jobs:
         id: prefix
         run: |
           if [ "${{ matrix.variant }}" = "cpu" ]; then
-            echo "prefix=v${{ matrix.version }}" >> "$GITHUB_OUTPUT"
+            echo "prefix=" >> "$GITHUB_OUTPUT"
           else
-            echo "prefix=v${{ matrix.version }}-${{ matrix.variant }}" >> "$GITHUB_OUTPUT"
+            echo "prefix=${{ matrix.variant }}-" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Docker meta
@@ -69,20 +68,18 @@ jobs:
         with:
           images: ${{ steps.imgname.outputs.image }}
           tags: |
-            type=raw,value=${{ steps.prefix.outputs.prefix }}-latest,enable={{is_default_branch}}
-            type=sha,prefix=${{ steps.prefix.outputs.prefix }}-,format=short
-            type=semver,pattern=${{ steps.prefix.outputs.prefix }}-{{version}}
+            type=raw,value=${{ steps.prefix.outputs.prefix }}latest,enable={{is_default_branch}}
+            type=sha,prefix=${{ steps.prefix.outputs.prefix }},format=short
+            type=semver,pattern=${{ steps.prefix.outputs.prefix }}{{version}}
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile.${{ matrix.variant }}
-          build-args: |
-            COSYVOICE_VERSION=${{ matrix.version }}
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.version }}-${{ matrix.variant }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.version }}-${{ matrix.variant }}
+          cache-from: type=gha,scope=${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant }}

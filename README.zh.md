@@ -8,19 +8,19 @@
 
 - **OpenAI TTS 兼容**：`POST /v1/audio/speech`，请求体格式与 OpenAI SDK 一致
 - **音色克隆**：挂载 `voices/` 目录下的 `xxx.wav` + `xxx.txt` 对，文件名即音色 id
-- **双版本**：CosyVoice 2 与 CosyVoice 3 各自独立镜像（v3 自动拼接指令前缀）
-- **4 个镜像**：`v2-cuda`、`v2-cpu`、`v3-cuda`、`v3-cpu`
+- **单镜像双版本**：同一镜像通过运行时环境变量 `COSYVOICE_VERSION` 选择 CosyVoice 2 或 3（v3 自动拼接指令前缀）
+- **2 个镜像**：`cuda`（GPU）和 CPU，各自同时支持 v2 与 v3
 - **模型/音色运行时挂载**：不打包进镜像
 - **多种输出格式**：`mp3`、`opus`、`aac`、`flac`、`wav`、`pcm`
 
 ## 可用镜像
 
-| 镜像 | CosyVoice 版本 | 设备 |
-|---|---|---|
-| `ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-cuda-latest` | CosyVoice 2 | CUDA 12.4 |
-| `ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-latest`      | CosyVoice 2 | CPU |
-| `ghcr.io/seancheung/cosyvoice-openai-tts-api:v3-cuda-latest` | CosyVoice 3 | CUDA 12.4 |
-| `ghcr.io/seancheung/cosyvoice-openai-tts-api:v3-latest`      | CosyVoice 3 | CPU |
+| 镜像 | 设备 |
+|---|---|
+| `ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest` | CUDA 12.4 |
+| `ghcr.io/seancheung/cosyvoice-openai-tts-api:latest`      | CPU |
+
+通过运行时环境变量 `-e COSYVOICE_VERSION=2` 或 `-e COSYVOICE_VERSION=3` 选择 CosyVoice 版本（默认 `3`），并挂载对应的模型目录。
 
 镜像仅构建 `linux/amd64`（`pynini` 在 conda-forge 只有 x86 版本）。
 
@@ -75,21 +75,21 @@ GPU 版本（推荐）：
 
 ```bash
 docker run --rm -p 8000:8000 --gpus all \
-  -v $PWD/models/CosyVoice2-0.5B:/models:ro \
+  -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
-  ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-cuda-latest
+  ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest
 ```
 
 CPU 版本：
 
 ```bash
 docker run --rm -p 8000:8000 \
-  -v $PWD/models/CosyVoice2-0.5B:/models:ro \
+  -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
-  ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-latest
+  ghcr.io/seancheung/cosyvoice-openai-tts-api:latest
 ```
 
-CosyVoice 3 把上面的 `v2` 换成 `v3`，并挂载对应的 v3 模型目录即可。
+切到 CosyVoice 2 只需设置 `-e COSYVOICE_VERSION=2`，并挂载对应的 v2 模型目录。
 
 > **GPU 要求**：宿主机需安装 NVIDIA 驱动与 [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)。Windows 需 Docker Desktop + WSL2 + NVIDIA Windows 驱动。
 
@@ -181,7 +181,7 @@ with client.audio.speech.with_streaming_response.create(
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `COSYVOICE_VERSION` | `2`（镜像构建时写入） | `2` 或 `3` |
+| `COSYVOICE_VERSION` | `3` | `2` 或 `3`；运行时选择 CosyVoice 版本 |
 | `COSYVOICE_MODEL_DIR` | `/models` | 模型目录或 modelscope ID |
 | `COSYVOICE_VOICES_DIR` | `/voices` | 音色目录 |
 | `COSYVOICE_FP16` | `false` | 半精度推理（仅 GPU 有意义） |
@@ -203,13 +203,11 @@ git submodule update --init --recursive
 
 # CUDA 镜像
 docker buildx build -f docker/Dockerfile.cuda \
-  --build-arg COSYVOICE_VERSION=2 \
-  -t cosyvoice-openai-tts-api:v2-cuda .
+  -t cosyvoice-openai-tts-api:cuda .
 
 # CPU 镜像
 docker buildx build -f docker/Dockerfile.cpu \
-  --build-arg COSYVOICE_VERSION=3 \
-  -t cosyvoice-openai-tts-api:v3-cpu .
+  -t cosyvoice-openai-tts-api:cpu .
 ```
 
 ## 局限 / 注意事项
@@ -240,7 +238,7 @@ docker buildx build -f docker/Dockerfile.cpu \
 │   ├── entrypoint.sh
 │   └── docker-compose.example.yml
 ├── .github/workflows/
-│   └── build-images.yml       # 2×2 矩阵构建
+│   └── build-images.yml       # cuda + cpu 矩阵构建
 └── README.md
 ```
 

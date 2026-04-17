@@ -8,19 +8,19 @@ An [OpenAI TTS](https://platform.openai.com/docs/api-reference/audio/createSpeec
 
 - **OpenAI TTS compatible** — `POST /v1/audio/speech` with the same request shape as the OpenAI SDK
 - **Voice cloning** — each voice is a `xxx.wav` + `xxx.txt` pair in a mounted directory; the filename is the voice id
-- **Both versions** — separate images for CosyVoice 2 and CosyVoice 3 (v3's instruction prefix is added automatically)
-- **4 images** — `v2-cuda`, `v2-cpu`, `v3-cuda`, `v3-cpu`
+- **Both versions in one image** — CosyVoice 2 or 3 is selected at runtime via `COSYVOICE_VERSION` (v3's instruction prefix is added automatically)
+- **2 images** — `cuda` (GPU) and CPU; each supports both v2 and v3
 - **Models & voices mounted at runtime** — nothing heavy baked into the image
 - **Multiple output formats** — `mp3`, `opus`, `aac`, `flac`, `wav`, `pcm`
 
 ## Available images
 
-| Image | CosyVoice version | Device |
-|---|---|---|
-| `ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-cuda-latest` | CosyVoice 2 | CUDA 12.4 |
-| `ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-latest`      | CosyVoice 2 | CPU |
-| `ghcr.io/seancheung/cosyvoice-openai-tts-api:v3-cuda-latest` | CosyVoice 3 | CUDA 12.4 |
-| `ghcr.io/seancheung/cosyvoice-openai-tts-api:v3-latest`      | CosyVoice 3 | CPU |
+| Image | Device |
+|---|---|
+| `ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest` | CUDA 12.4 |
+| `ghcr.io/seancheung/cosyvoice-openai-tts-api:latest`      | CPU |
+
+Pick the CosyVoice version at runtime with `-e COSYVOICE_VERSION=2` or `-e COSYVOICE_VERSION=3` (default `3`), and mount the matching model directory.
 
 Images are built for `linux/amd64` only (`pynini` on conda-forge has no ARM build).
 
@@ -75,21 +75,21 @@ GPU (recommended):
 
 ```bash
 docker run --rm -p 8000:8000 --gpus all \
-  -v $PWD/models/CosyVoice2-0.5B:/models:ro \
+  -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
-  ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-cuda-latest
+  ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest
 ```
 
 CPU:
 
 ```bash
 docker run --rm -p 8000:8000 \
-  -v $PWD/models/CosyVoice2-0.5B:/models:ro \
+  -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
-  ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-latest
+  ghcr.io/seancheung/cosyvoice-openai-tts-api:latest
 ```
 
-For CosyVoice 3, swap `v2` → `v3` and mount the matching v3 model directory.
+For CosyVoice 2, set `-e COSYVOICE_VERSION=2` and mount the matching v2 model directory.
 
 > **GPU prerequisites**: NVIDIA driver + [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) on Linux. On Windows use Docker Desktop + WSL2 + NVIDIA Windows driver (R470+); no host CUDA toolkit required.
 
@@ -181,7 +181,7 @@ Returns model version, sample rate, and status for health checks.
 
 | Variable | Default | Description |
 |---|---|---|
-| `COSYVOICE_VERSION` | `2` (written at image build) | `2` or `3` |
+| `COSYVOICE_VERSION` | `3` | `2` or `3`; selects the CosyVoice version at runtime |
 | `COSYVOICE_MODEL_DIR` | `/models` | Model directory or modelscope id |
 | `COSYVOICE_VOICES_DIR` | `/voices` | Voices directory |
 | `COSYVOICE_FP16` | `false` | Half-precision inference (GPU only) |
@@ -203,13 +203,11 @@ git submodule update --init --recursive
 
 # CUDA image
 docker buildx build -f docker/Dockerfile.cuda \
-  --build-arg COSYVOICE_VERSION=2 \
-  -t cosyvoice-openai-tts-api:v2-cuda .
+  -t cosyvoice-openai-tts-api:cuda .
 
 # CPU image
 docker buildx build -f docker/Dockerfile.cpu \
-  --build-arg COSYVOICE_VERSION=3 \
-  -t cosyvoice-openai-tts-api:v3-cpu .
+  -t cosyvoice-openai-tts-api:cpu .
 ```
 
 ## Caveats
@@ -240,7 +238,7 @@ docker buildx build -f docker/Dockerfile.cpu \
 │   ├── entrypoint.sh
 │   └── docker-compose.example.yml
 ├── .github/workflows/
-│   └── build-images.yml       # 2×2 matrix build
+│   └── build-images.yml       # cuda + cpu matrix build
 └── README.md
 ```
 

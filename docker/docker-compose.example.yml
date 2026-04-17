@@ -1,6 +1,6 @@
 services:
   cosyvoice2-cuda:
-    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-cuda-latest
+    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest
     ports:
       - "8002:8000"
     volumes:
@@ -18,7 +18,7 @@ services:
               capabilities: [gpu]
 
   cosyvoice3-cuda:
-    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:v3-cuda-latest
+    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest
     ports:
       - "8003:8000"
     volumes:
@@ -36,7 +36,7 @@ services:
               capabilities: [gpu]
 
   cosyvoice2-cpu:
-    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:v2-latest
+    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:latest
     ports:
       - "8012:8000"
     volumes:
@@ -46,7 +46,7 @@ services:
       COSYVOICE_VERSION: "2"
 
   cosyvoice3-cpu:
-    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:v3-latest
+    image: ghcr.io/seancheung/cosyvoice-openai-tts-api:latest
     ports:
       - "8013:8000"
     volumes:
