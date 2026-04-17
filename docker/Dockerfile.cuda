@@ -23,10 +23,16 @@ ENV PATH=/opt/conda/bin:${PATH}
 RUN conda install -y -c conda-forge python=3.10 pynini==2.1.5 \
     && conda clean -afy
 
+# openai-whisper==20231117's setup.py imports pkg_resources, which setuptools
+# 81+ no longer ships. Pin below that and build it without isolation so it
+# sees this setuptools instead of pip's fresh build env.
+RUN pip install --no-cache-dir --upgrade pip "setuptools<81" wheel
+
 COPY CosyVoice /opt/CosyVoice
 
-RUN pip install --no-cache-dir -r /opt/CosyVoice/requirements.txt \
-    && pip cache purge || true
+RUN pip install --no-cache-dir --no-build-isolation openai-whisper==20231117 \
+    && pip install --no-cache-dir -r /opt/CosyVoice/requirements.txt \
+    && { pip cache purge || true; }
 
 COPY docker/requirements.api.txt /tmp/requirements.api.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.api.txt
