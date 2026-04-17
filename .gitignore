@@ -7,8 +7,7 @@ __pycache__/
 *.log
 
 models/
-voices/*
-!voices/.gitkeep
+voices/
 
 build/
 dist/

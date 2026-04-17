@@ -37,6 +37,7 @@ COPY app /opt/api/app
 
 WORKDIR /opt/api
 
+VOLUME ["/voices", "/models"]
 EXPOSE 8000
 
 COPY docker/entrypoint.sh /entrypoint.sh

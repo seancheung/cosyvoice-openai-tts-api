@@ -241,7 +241,6 @@ docker buildx build -f docker/Dockerfile.cpu \
 │   └── docker-compose.example.yml
 ├── .github/workflows/
 │   └── build-images.yml       # 2×2 matrix build
-├── voices/                    # mounted at runtime
 └── README.md
 ```
 
