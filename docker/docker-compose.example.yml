@@ -4,11 +4,11 @@ services:
     ports:
       - "8002:8000"
     volumes:
-      - ./models/CosyVoice2-0.5B:/models:ro
       - ./voices:/voices:ro
       - ./cache:/root/.cache
     environment:
       COSYVOICE_VERSION: "2"
+      COSYVOICE_MODEL: "iic/CosyVoice2-0.5B"
       COSYVOICE_FP16: "true"
     deploy:
       resources:
@@ -23,11 +23,11 @@ services:
     ports:
       - "8003:8000"
     volumes:
-      - ./models/Fun-CosyVoice3-0.5B:/models:ro
       - ./voices:/voices:ro
       - ./cache:/root/.cache
     environment:
       COSYVOICE_VERSION: "3"
+      COSYVOICE_MODEL: "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
       COSYVOICE_FP16: "true"
     deploy:
       resources:
@@ -42,19 +42,19 @@ services:
     ports:
       - "8012:8000"
     volumes:
-      - ./models/CosyVoice2-0.5B:/models:ro
       - ./voices:/voices:ro
       - ./cache:/root/.cache
     environment:
       COSYVOICE_VERSION: "2"
+      COSYVOICE_MODEL: "iic/CosyVoice2-0.5B"
 
   cosyvoice3-cpu:
     image: ghcr.io/seancheung/cosyvoice-openai-tts-api:latest
     ports:
       - "8013:8000"
     volumes:
-      - ./models/Fun-CosyVoice3-0.5B:/models:ro
       - ./voices:/voices:ro
       - ./cache:/root/.cache
     environment:
       COSYVOICE_VERSION: "3"
+      COSYVOICE_MODEL: "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"

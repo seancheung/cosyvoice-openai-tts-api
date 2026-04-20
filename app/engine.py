@@ -34,7 +34,7 @@ class TTSEngine:
         from cosyvoice.cli.cosyvoice import CosyVoice2, CosyVoice3
 
         self.version = settings.cosyvoice_version
-        self.model_dir = settings.cosyvoice_model_dir
+        self.model_dir = settings.cosyvoice_model
         self._validate_model_dir()
 
         common_kwargs = dict(
@@ -61,8 +61,9 @@ class TTSEngine:
     def _validate_model_dir(self) -> None:
         p = Path(self.model_dir)
         if not p.exists() or not p.is_dir():
-            log.warning(
-                "model_dir %s not a local directory; CosyVoice will try to download via modelscope",
+            log.info(
+                "model_dir %s is not a local path; CosyVoice will download it via modelscope "
+                "on first use (cached under /root/.cache/modelscope)",
                 self.model_dir,
             )
             return

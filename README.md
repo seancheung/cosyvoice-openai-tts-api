@@ -10,7 +10,7 @@ An [OpenAI TTS](https://platform.openai.com/docs/api-reference/audio/createSpeec
 - **Voice cloning** — each voice is a `xxx.wav` + `xxx.txt` pair in a mounted directory; the filename is the voice id
 - **Both versions in one image** — CosyVoice 2 or 3 is selected at runtime via `COSYVOICE_VERSION` (v3's instruction prefix is added automatically)
 - **2 images** — `cuda` (GPU) and CPU; each supports both v2 and v3
-- **Models & voices mounted at runtime** — nothing heavy baked into the image
+- **Auto model download** — weights are pulled from ModelScope on first start into the mounted cache; no pre-download required
 - **Multiple output formats** — `mp3`, `opus`, `aac`, `flac`, `wav`, `pcm`
 
 ## Available images
@@ -20,44 +20,13 @@ An [OpenAI TTS](https://platform.openai.com/docs/api-reference/audio/createSpeec
 | `ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest` | CUDA 12.4 |
 | `ghcr.io/seancheung/cosyvoice-openai-tts-api:latest`      | CPU |
 
-Pick the CosyVoice version at runtime with `-e COSYVOICE_VERSION=2` or `-e COSYVOICE_VERSION=3` (default `3`), and mount the matching model directory.
+Pick the CosyVoice version at runtime with `-e COSYVOICE_VERSION=2` or `-e COSYVOICE_VERSION=3` (default `3`).
 
 Images are built for `linux/amd64` only (`pynini` on conda-forge has no ARM build).
 
 ## Quick start
 
-### 1. Download a model
-
-Models are kept on the host and mounted into `/models` at runtime.
-
-CosyVoice 2:
-
-```bash
-pip install modelscope
-modelscope download --model iic/CosyVoice2-0.5B \
-  --local_dir ./models/CosyVoice2-0.5B
-```
-
-CosyVoice 3:
-
-```bash
-modelscope download --model FunAudioLLM/Fun-CosyVoice3-0.5B-2512 \
-  --local_dir ./models/Fun-CosyVoice3-0.5B
-```
-
-HuggingFace also works:
-
-```bash
-pip install huggingface_hub
-huggingface-cli download FunAudioLLM/CosyVoice2-0.5B \
-  --local-dir ./models/CosyVoice2-0.5B
-```
-
-The mounted directory must contain the config file that matches the image version:
-- v2 requires `cosyvoice2.yaml`
-- v3 requires `cosyvoice3.yaml`
-
-### 2. Prepare the voices directory
+### 1. Prepare the voices directory
 
 ```
 voices/
@@ -69,15 +38,14 @@ voices/
 
 **Rules**: a voice is valid only when both files with the same stem exist; the stem is the voice id; unpaired or extra files are ignored.
 
-### 3. Run the container
+### 2. Run the container
 
-Beyond the main model mounted at `/models`, CosyVoice lazily downloads a few auxiliary models on first use — Whisper into `~/.cache/whisper/`, HuggingFace tokenizers into `~/.cache/huggingface/`, and any ModelScope resources into `~/.cache/modelscope/`. Mount a persistent directory at `/root/.cache` so these survive container restarts.
+On first start the image downloads the matching CosyVoice weights from ModelScope into `/root/.cache/modelscope`, plus a few auxiliary caches (Whisper, HuggingFace tokenizers) into the same `/root/.cache` tree. Mount a persistent directory at `/root/.cache` so these survive container restarts.
 
 GPU (recommended):
 
 ```bash
 docker run --rm -p 8000:8000 --gpus all \
-  -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
   -v $PWD/cache:/root/.cache \
   ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest
@@ -87,17 +55,16 @@ CPU:
 
 ```bash
 docker run --rm -p 8000:8000 \
-  -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
   -v $PWD/cache:/root/.cache \
   ghcr.io/seancheung/cosyvoice-openai-tts-api:latest
 ```
 
-For CosyVoice 2, set `-e COSYVOICE_VERSION=2` and mount the matching v2 model directory.
+For CosyVoice 2, set both `-e COSYVOICE_VERSION=2` and `-e COSYVOICE_MODEL=iic/CosyVoice2-0.5B`. `COSYVOICE_MODEL` accepts any ModelScope id or local path (mount the path in if it's local).
 
 > **GPU prerequisites**: NVIDIA driver + [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) on Linux. On Windows use Docker Desktop + WSL2 + NVIDIA Windows driver (R470+); no host CUDA toolkit required.
 
-### 4. docker-compose
+### 3. docker-compose
 
 See [`docker/docker-compose.example.yml`](./docker/docker-compose.example.yml).
 
@@ -185,8 +152,8 @@ Returns model version, sample rate, and status for health checks.
 
 | Variable | Default | Description |
 |---|---|---|
-| `COSYVOICE_VERSION` | `3` | `2` or `3`; selects the CosyVoice version at runtime |
-| `COSYVOICE_MODEL_DIR` | `/models` | Model directory or modelscope id |
+| `COSYVOICE_VERSION` | `3` | `2` or `3`; selects which CosyVoice class is loaded (compatibility only) |
+| `COSYVOICE_MODEL` | `FunAudioLLM/Fun-CosyVoice3-0.5B-2512` | ModelScope id or local path; auto-downloaded on first start if not local. Must match `COSYVOICE_VERSION` |
 | `COSYVOICE_VOICES_DIR` | `/voices` | Voices directory |
 | `COSYVOICE_FP16` | `false` | Half-precision inference (GPU only) |
 | `COSYVOICE_LOAD_JIT` | `false` | JIT-compile flow encoder (v2 only) |
@@ -220,7 +187,8 @@ docker buildx build -f docker/Dockerfile.cpu \
 - **Concurrency** — a single CosyVoice instance is not thread-safe; the service serializes inference with an asyncio Lock. Scale out by running more containers behind a load balancer.
 - **Long text** — requests whose `input` exceeds `MAX_INPUT_CHARS` (default 8000) return 413; CosyVoice itself handles sentence splitting internally.
 - **amd64 only** — `pynini` has no ARM conda-forge build.
-- **Version matching** — on startup the service checks the mounted model for `cosyvoice{2,3}.yaml` that matches `COSYVOICE_VERSION`; a mismatch fails fast.
+- **First-run download** — the first container start downloads several GB from ModelScope; subsequent starts reuse `/root/.cache/modelscope`. Keep the cache volume warm to avoid re-downloads.
+- **Version matching** — when `COSYVOICE_MODEL` points at a local directory, the service checks it for a `cosyvoice{2,3}.yaml` that matches `COSYVOICE_VERSION` and fails fast on mismatch.
 
 ## Project layout
 

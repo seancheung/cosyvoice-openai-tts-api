@@ -10,7 +10,7 @@
 - **音色克隆**：挂载 `voices/` 目录下的 `xxx.wav` + `xxx.txt` 对，文件名即音色 id
 - **单镜像双版本**：同一镜像通过运行时环境变量 `COSYVOICE_VERSION` 选择 CosyVoice 2 或 3（v3 自动拼接指令前缀）
 - **2 个镜像**：`cuda`（GPU）和 CPU，各自同时支持 v2 与 v3
-- **模型/音色运行时挂载**：不打包进镜像
+- **首次启动自动下载权重**：首次启动从 ModelScope 拉取模型权重到挂载的缓存目录，无需提前手动下载
 - **多种输出格式**：`mp3`、`opus`、`aac`、`flac`、`wav`、`pcm`
 
 ## 可用镜像
@@ -20,44 +20,13 @@
 | `ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest` | CUDA 12.4 |
 | `ghcr.io/seancheung/cosyvoice-openai-tts-api:latest`      | CPU |
 
-通过运行时环境变量 `-e COSYVOICE_VERSION=2` 或 `-e COSYVOICE_VERSION=3` 选择 CosyVoice 版本（默认 `3`），并挂载对应的模型目录。
+通过运行时环境变量 `-e COSYVOICE_VERSION=2` 或 `-e COSYVOICE_VERSION=3` 选择 CosyVoice 版本（默认 `3`）。
 
 镜像仅构建 `linux/amd64`（`pynini` 在 conda-forge 只有 x86 版本）。
 
 ## 快速开始
 
-### 1. 下载模型
-
-模型需要预先下载到本机目录，容器启动时挂载到 `/models`。
-
-CosyVoice 2：
-
-```bash
-pip install modelscope
-modelscope download --model iic/CosyVoice2-0.5B \
-  --local_dir ./models/CosyVoice2-0.5B
-```
-
-CosyVoice 3：
-
-```bash
-modelscope download --model FunAudioLLM/Fun-CosyVoice3-0.5B-2512 \
-  --local_dir ./models/Fun-CosyVoice3-0.5B
-```
-
-也可以用 HuggingFace：
-
-```bash
-pip install huggingface_hub
-huggingface-cli download FunAudioLLM/CosyVoice2-0.5B \
-  --local-dir ./models/CosyVoice2-0.5B
-```
-
-挂载的目录必须包含对应版本的配置文件：
-- v2 需要 `cosyvoice2.yaml`
-- v3 需要 `cosyvoice3.yaml`
-
-### 2. 准备音色目录
+### 1. 准备音色目录
 
 ```
 voices/
@@ -69,15 +38,14 @@ voices/
 
 **规则**：必须同时存在同名的 `.wav` 和 `.txt` 才会被识别为有效音色；文件名（不含后缀）即音色 id；多余或缺对的文件会被忽略。
 
-### 3. 运行容器
+### 2. 运行容器
 
-除了 `/models` 下的主模型，CosyVoice 还会在首次使用时懒加载若干辅助模型：Whisper 缓存到 `~/.cache/whisper/`，HuggingFace tokenizer 缓存到 `~/.cache/huggingface/`，ModelScope 资源缓存到 `~/.cache/modelscope/`。把一个持久目录挂到容器的 `/root/.cache`，这些缓存就能在容器重启后复用，避免重复下载。
+首次启动时容器会自动从 ModelScope 拉取与 `COSYVOICE_VERSION` 匹配的主模型权重到 `/root/.cache/modelscope`；此外 Whisper、HuggingFace tokenizer 等辅助缓存也会落到同一个 `/root/.cache` 目录下。把一个持久目录挂到容器的 `/root/.cache`，这些缓存就能在容器重启后复用，避免重复下载。
 
 GPU 版本（推荐）：
 
 ```bash
 docker run --rm -p 8000:8000 --gpus all \
-  -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
   -v $PWD/cache:/root/.cache \
   ghcr.io/seancheung/cosyvoice-openai-tts-api:cuda-latest
@@ -87,17 +55,16 @@ CPU 版本：
 
 ```bash
 docker run --rm -p 8000:8000 \
-  -v $PWD/models/Fun-CosyVoice3-0.5B:/models:ro \
   -v $PWD/voices:/voices:ro \
   -v $PWD/cache:/root/.cache \
   ghcr.io/seancheung/cosyvoice-openai-tts-api:latest
 ```
 
-切到 CosyVoice 2 只需设置 `-e COSYVOICE_VERSION=2`，并挂载对应的 v2 模型目录。
+切到 CosyVoice 2 需要同时设置 `-e COSYVOICE_VERSION=2` 和 `-e COSYVOICE_MODEL=iic/CosyVoice2-0.5B`。`COSYVOICE_MODEL` 可以是任意 ModelScope id，也可以是本地路径（本地路径时记得把它挂载进容器）。
 
 > **GPU 要求**：宿主机需安装 NVIDIA 驱动与 [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)。Windows 需 Docker Desktop + WSL2 + NVIDIA Windows 驱动。
 
-### 4. docker-compose
+### 3. docker-compose
 
 参考 [`docker/docker-compose.example.yml`](./docker/docker-compose.example.yml)。
 
@@ -185,8 +152,8 @@ with client.audio.speech.with_streaming_response.create(
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `COSYVOICE_VERSION` | `3` | `2` 或 `3`；运行时选择 CosyVoice 版本 |
-| `COSYVOICE_MODEL_DIR` | `/models` | 模型目录或 modelscope ID |
+| `COSYVOICE_VERSION` | `3` | `2` 或 `3`；选择加载哪一版 CosyVoice 类（仅用于兼容性） |
+| `COSYVOICE_MODEL` | `FunAudioLLM/Fun-CosyVoice3-0.5B-2512` | ModelScope id 或本地路径；非本地路径时首次启动自动下载，需与 `COSYVOICE_VERSION` 匹配 |
 | `COSYVOICE_VOICES_DIR` | `/voices` | 音色目录 |
 | `COSYVOICE_FP16` | `false` | 半精度推理（仅 GPU 有意义） |
 | `COSYVOICE_LOAD_JIT` | `false` | JIT 编译 flow encoder（仅 v2） |
@@ -220,7 +187,8 @@ docker buildx build -f docker/Dockerfile.cpu \
 - **并发**：CosyVoice 模型在单实例下非线程安全，服务内部用 asyncio Lock 串行化。并发请求依赖横向扩容（多容器 + 负载均衡）。
 - **长文本**：超过 `MAX_INPUT_CHARS`（默认 8000）返回 413；CosyVoice 内部已自动切句。
 - **仅 amd64**：`pynini` 仅有 x86 的 conda-forge 构建，ARM 不支持。
-- **模型版本匹配**：启动时会校验挂载的模型目录内是否存在 `cosyvoice{2,3}.yaml`，不匹配直接失败。
+- **首次启动下载**：第一次启动会从 ModelScope 拉取数 GB 模型权重；之后容器启动复用 `/root/.cache/modelscope`。请保留缓存卷以避免重复下载。
+- **模型版本匹配**：当 `COSYVOICE_MODEL` 指向本地目录时，启动时会校验其中是否存在匹配 `COSYVOICE_VERSION` 的 `cosyvoice{2,3}.yaml`，不匹配直接失败。
 
 ## 目录结构
 

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="", case_sensitive=False, extra="ignore")
 
     cosyvoice_version: Literal["2", "3"] = Field(default="3")
-    cosyvoice_model_dir: str = Field(default="/models")
+    cosyvoice_model: str = Field(default="FunAudioLLM/Fun-CosyVoice3-0.5B-2512")
     cosyvoice_voices_dir: str = Field(default="/voices")
 
     cosyvoice_fp16: bool = Field(default=False)

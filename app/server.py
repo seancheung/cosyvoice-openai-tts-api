@@ -44,7 +44,7 @@ async def healthz(request: Request) -> HealthResponse:
         status="ok",
         version=settings.cosyvoice_version,
         sample_rate=engine.sample_rate,
-        model_dir=settings.cosyvoice_model_dir,
+        model_dir=settings.cosyvoice_model,
     )
 
 
