@@ -20,7 +20,11 @@ RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Mi
     && bash /tmp/mf.sh -b -p /opt/conda \
     && rm /tmp/mf.sh
 
-RUN conda install -y -c conda-forge python=3.10 pynini==2.1.5 \
+# cuda-nvcc is needed at runtime: DeepSpeed probes `nvcc -V` at import time
+# to detect the system CUDA version (see deepspeed/ops/op_builder/builder.py).
+# Installing it via conda lets it ride along with /opt/conda into the runtime
+# stage without pulling in the full CUDA SDK.
+RUN conda install -y -c nvidia -c conda-forge python=3.10 pynini==2.1.5 cuda-nvcc=12.4.* \
     && conda clean -afy
 
 # openai-whisper==20231117's setup.py imports pkg_resources, which setuptools
@@ -62,6 +66,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/conda /opt/conda
 COPY --from=builder /opt/CosyVoice /opt/CosyVoice
 COPY app /opt/api/app
+
+# DeepSpeed calls ${CUDA_HOME}/bin/nvcc on import; the -runtime- base image
+# lacks nvcc, so expose the copy installed into /opt/conda at that path.
+RUN mkdir -p /usr/local/cuda/bin \
+    && ln -s /opt/conda/bin/nvcc /usr/local/cuda/bin/nvcc
 
 WORKDIR /opt/api
 
